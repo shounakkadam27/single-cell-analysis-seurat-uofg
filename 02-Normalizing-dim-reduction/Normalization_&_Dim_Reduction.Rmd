@@ -1,0 +1,257 @@
+---
+title: "The_Seurat_object_&_scRNA_QC"
+author: "Shounak Kadam"
+date: "2025-10-31"
+output: 
+  github_document: default 
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+## 🧬 Overview
+
+Single-cell RNA-seq produces expression values for thousands of genes across thousands of cells.\
+At this stage, we don't yet know what cell types are present - the dataset is high-dimensional and noisy.
+
+The goal of this session is to:
+
+-   **Reduce data complexity** so biological structure becomes visible
+-   **Group similar cells** based on their expression profiles
+-   **Identify marker genes** for each emerging group
+-   **Prepare for cell-type annotation and downstream analysis**
+
+By applying normalisation, PCA, and non-linear embeddings (UMAP/t-SNE), we transform raw count matrices into a meaningful low-dimensional representation where cell populations begin to separate.
+
+```{r, message='FALSE', warning='FALSE'}
+library(Seurat)
+library(ggplot2)
+```
+
+# Load QC Seurat object from Tutorial 1
+```{r, message='FALSE', warning='FALSE'}
+sc.data <- readRDS("/Users/shounakkadam/Documents/Module C - Single cell and spatial transcriptomics/bulk_data/outputs/seurat/01_qc_seurat.rds")
+```
+
+## Task 1.1 — Normalising (LogNormalize + Scale)
+
+Single-cell RNA-seq raw counts vary greatly across cells due to sequencing depth differences.\
+Before dimensionality reduction, we normalise expression values and scale them so each gene contributes appropriately to PCA.
+
+**What we do:**
+
+-   `NormalizeData()` — log normalises counts to make values comparable across cells\
+-   `ScaleData()` — centers & scales genes (mean=0, variance=1) to prepare for PCA
+
+This stores processed values in the **RNA assay** under `data` and `scale.data`.
+
+```{r, message='FALSE', warning='FALSE', results='hide'}
+sc.data=NormalizeData(sc.data)
+sc.data=ScaleData(sc.data)
+```
+
+## Task 1.2 — Identify Highly Variable Genes (HVGs)
+
+After normalisation, not all genes are equally informative - many show little or no variation across cells.\
+We identify **highly variable genes (HVGs)** to focus on biologically meaningful variation and improve PCA efficiency.
+
+**Why this step matters** - scRNA-seq has thousands of genes → many are uninformative or noisy\
+- HVGs capture true biological differences across cells\
+- Reduces computational complexity and improves clustering
+
+We will keep the **top 2,000 most variable genes** using the `vst` method (default in Seurat).
+
+```{r, message='FALSE', warning='FALSE'}
+sc.data=FindVariableFeatures(sc.data,selection.method="vst",nfeatures=2000)
+```
+
+These can be found in the RNA slot. We can see the variable genes with either:
+
+```{r, message='FALSE', warning='FALSE'}
+variable.genes=VariableFeatures(sc.data)
+```
+
+## Task 1.3 - It is also handy to plot the variable genes:
+
+```{r, message='FALSE', warning='FALSE'}
+top10=head(variable.genes, 10)
+plot1=VariableFeaturePlot(sc.data)
+plot2=LabelPoints(plot=plot1,points=top10,repel=FALSE,xnudge=0,ynudge=0)
+plot2
+```
+
+> The red points represent variable genes; black points represent non-variable genes.\
+> Top variable genes are automatically labelled.
+
+### **Interpretation**
+
+The most variable genes include canonical immune genes such as **S100A8, S100A9, LST1, PF4, GNLY, NKG7, IGLL5, FTH1 genes**, which are commonly expressed in immune cell subsets like monocytes, platelets, NK cells, and B cells.\
+This suggests **strong immune flavour**, consistent with PBMC data.
+
+> These genes may act as **cell-type markers**, helping to distinguish immune populations later during clustering.
+
+## Task 1.4 - SCTransfrom (Alternative Normalization)
+
+An alternative to the LogNormalize workflow is **SCTransform (SCT)**, which performs:
+
+-   Normalization\
+-   Scaling\
+-   Variable feature selection
+
+**in one step** using regularized negative binomial regression.
+
+SCT is often preferred for droplet scRNA-seq (10x PBMCs) because it more effectively removes technical noise and improves biological signal for clustering and UMAP.
+
+```{r, message = 'FALSE', warning='FALSE'}
+sc.data=SCTransform(sc.data, verbose=TRUE, variable.features.n = 3000)
+```
+
+## Task 1.5 — SCTransform with Mitochondrial Regression
+
+SCTransform can also regress out technical covariates such as mitochondrial percentage\
+(`percent_mito`). This reduces noise from stressed or dying cells and improves clustering quality.
+
+```{r, message = 'FALSE', warning = 'FALSE'}
+sc.data=SCTransform(sc.data ,vars.to.regress="percent_mito", verbose = TRUE)
+```
+
+## Task 1.6 — Check and Set Active Assay
+
+Now that the Seurat object contains multiple assays (`RNA` and `SCT`),\
+we must ensure we are working on the correct one for downstream analysis.
+
+The **active assay** determines which data layers functions like PCA and UMAP operate on.
+
+```{r, message = 'FALSE', warning = 'FALSE'}
+DefaultAssay(sc.data) = "RNA"
+DefaultAssay(sc.data) = "SCT"
+```
+
+## Task 2 - PCA on SCT assay
+
+```{r, message='FALSE', warning='FALSE'}
+DefaultAssay(sc.data) = "SCT"
+
+sc.data=RunPCA(sc.data, assay = "SCT", npcs = 50, verbose = FALSE)
+```
+
+## Task 2.1 - Extract PCA cell embeddings as data frame
+
+```{r, message='FALSE', warning='FALSE'}
+pca_df=as.data.frame(sc.data@reductions$pca@cell.embeddings)
+head(pca_df)
+```
+
+## Task 2.2 — Inspect PCA gene loadings
+
+We can view the genes that contribute most (positively or negatively) to each principal component.
+
+> `dims` = which PCs to show.\
+> `nfeatures` = how many top-loading genes per PC (positive & negative).
+
+```{r, message='TRUE', warning='FALSE'}
+print(sc.data@reductions$pca, dims=1:10, nfeatures=5)
+```
+
+## Task 2.3 - PCA loadings: which genes drive each PC
+
+# Show top genes driving PC1–PC2
+
+```{r, message='FALSE', warning='FALSE'}
+VizDimLoadings(sc.data, dims=1:2, reduction="pca", nfeatures=30)
+```
+
+# 👉 Modifed to show MORE components but FEWER genes
+
+# Example: PCs 1–10, top 10 genes per PC
+
+```{r, message='FALSE', warning='FALSE'}
+VizDimLoadings(sc.data, dims=1:10, reduction="pca", nfeatures=10)
+```
+
+## Task 2.4 - PCA heatmap across PCs and a subset of cells
+
+# PCs 1–5, sample 500 cells, balance pos/neg loadings
+
+```{r, message='FALSE', warning='FALSE'}
+DimHeatmap(sc.data, dims=1:9, cells=300, balanced = TRUE)
+```
+
+## Task 2.5 - Elbow plot to help decide the maximum useful dimensions.
+
+```{r, message='TRUE', warning='FALSE'}
+ElbowPlot(sc.data, ndims=50)
+```
+
+### Task 2.6 - PC Selection
+
+The elbow plot shows a clear inflection around PCs 10–15, with diminishing returns beyond \~PC20.\
+We therefore selected **PCs 1–20** for UMAP and clustering, capturing major biological structure without adding noise.
+
+### PCA cell embedding visualization
+
+# PCA dims 1 vs 2
+
+```{r, message='FALSE', warning='FALSE'}
+DimPlot(sc.data, reduction = "pca", dims = c(1, 2)) + NoLegend()
+```
+
+## Additional PCs to inspect sub structure
+
+```{r, message='FALSE', warning='FALSE'}
+DimPlot(sc.data, reduction="pca", dims=c(3,4)) + NoLegend()
+DimPlot(sc.data, reduction="pca", dims=c(5,6)) + NoLegend()
+DimPlot(sc.data, reduction="pca", dims=c(7,8)) + NoLegend()
+DimPlot(sc.data, reduction="pca", dims=c(9,10)) + NoLegend()
+```
+
+## Task 2.7 - UMAP on PCA - we need to further reduce the data.
+
+We want all the data to be represented on only two components. To do so we use UMAP on the PCA. UMAP tries to further reduce PCA into 2 dimensions
+
+```{r, message='FALSE', warning='FALSE'}
+sc.data=RunUMAP(sc.data,dims=1:20)
+DimPlot(sc.data,reduction="umap")
+```
+
+## Why PCA before UMAP?
+
+-   **PCA = statistical, linear, faithful.** It captures the main axes of biological variation with interpretable components and loadings (useful for clustering + inference).
+-   **UMAP = non-linear, for visualisation.** Great 2D map, but distances/areas are *not* statistically meaningful and can be distorted by parameters.
+-   **Computational reason:** running UMAP on all genes/cells is heavy; running it on **PCA embeddings** (e.g., PCs 1–20) is fast and stable.
+-   **Analysis rule:** *Do not* perform statistics on the UMAP layout. Do analysis on **normalised data / PCA space**, and use UMAP only to **visualise** results.
+
+## Clustering based on PCA
+
+We cluster cells in PCA space because PCA preserves true biological structure, while UMAP is only for visualization.\
+Clustering assigns each cell to a group (`seurat_clusters`) stored in the metadata.
+
+## Task 2.8 - Graph based clustering
+
+```{r, message='FALSE', warning='FALSE'}
+use.dims= 1:20 # from earlier elbow plot interpretation
+sc.data = FindNeighbors(object = sc.data, dims = use.dims)
+sc.data = FindClusters(object = sc.data, resolution = 0.5)
+head(sc.data@meta.data$seurat_clusters)
+```
+
+## Task 2.9 - Re-running UMAP which shows a UMAP plot with the cells coloured by assigned clusters
+
+```{r, message='FALSE', warning='FALSE'}
+sc.data = RunUMAP(sc.data,dims = use.dims, min.dist = 0.2, spread = 0.5)
+DimPlot(sc.data,reduction="umap",label=TRUE)
+```
+
+## UMAP and clustering interpretation
+
+> After performing PCA-based graph clustering and UMAP embedding, the dataset separates into several distinct groups of cells. Each cluster represents a transcriptionally similar population, indicating meaningful biological structure rather than random variation.
+
+> The use of PCs 1–20 preserved granularity while minimizing noise, and a clustering resolution of 0.5 produced clear, well-defined groups. Multiple discrete clusters are visible, consistent with expected immune cell heterogeneity in PBMC data (e.g., T cells, NK cells, B cells, monocytes, platelets). Some clusters show close spatial proximity on the UMAP, reflecting related cell types (e.g., T and NK cells), whereas others occupy distinct regions, indicating transcriptionally divergent populations (e.g., monocytes vs lymphocytes).
+
+> UMAP is used only for visualization, and statistical clustering was performed in PCA space. The resulting map confirms that the dataset contains diverse immune subsets and that the parameters chosen (PCs 1–20, resolution = 0.5, min.dist = 0.2) successfully separate biologically meaningful cell states.
