@@ -1,5 +1,5 @@
 ---
-title: "The_Seurat_object_&_scRNA_QC"
+title: "The_Seurat_Object_Normalizig_Dimensionality_Reduction"
 author: "Shounak Kadam"
 date: "2025-10-31"
 output: 
