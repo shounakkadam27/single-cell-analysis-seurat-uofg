@@ -1,7 +1,7 @@
-The_Seurat_object\_&\_scRNA_QC
+The_Seurat_Object_Normalizing_Dimensionality_Reduction
 ================
 Shounak Kadam
-2025-10-31
+2025-11-3
 
 ## 🧬 Overview
 
