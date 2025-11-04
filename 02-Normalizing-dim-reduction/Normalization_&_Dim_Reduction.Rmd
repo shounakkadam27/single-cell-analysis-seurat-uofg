@@ -17,17 +17,31 @@ knitr::opts_chunk$set(
 
 ## 🧬 Overview
 
-Single-cell RNA-seq produces expression values for thousands of genes across thousands of cells.\
-At this stage, we don't yet know what cell types are present - the dataset is high-dimensional and noisy.
+n this analysis, we process PBMC (Peripheral Blood Mononuclear Cells) scRNA-seq data through key computational steps to prepare it for downstream interpretation and cell-type annotation.
+After QC & filtering in Tutorial 1, the goal here is to normalize the data, identify variable genes, reduce dimensionality, and cluster cells into putative populations.
 
-The goal of this session is to:
+PBMCs contain diverse immune subsets:
+T cells
+B cells
+NK cells
+Monocytes
+Platelets (low-RNA contaminants)
+These cell types have subtle transcriptional differences, so proper normalization and dimensionality reduction are crucial to separate them.
 
--   **Reduce data complexity** so biological structure becomes visible
--   **Group similar cells** based on their expression profiles
--   **Identify marker genes** for each emerging group
--   **Prepare for cell-type annotation and downstream analysis**
+🎯 Goals
+Normalize gene expression (Log-normalization & SCTransform)
+Identify highly variable genes
+Perform Principal Component Analysis (PCA)
+Visualize data in 2D using UMAP
+Construct k-nearest neighbor graph and perform graph-based clustering
+Inspect UMAP clusters to reveal distinct immune cell groups
+These steps convert thousands of gene features into meaningful structure, enabling biological interpretation in the next tutorial.
 
-By applying normalisation, PCA, and non-linear embeddings (UMAP/t-SNE), we transform raw count matrices into a meaningful low-dimensional representation where cell populations begin to separate.
+✅ Output of this tutorial
+Normalized Seurat object
+PCA embeddings & variance interpretation (Elbow plot)
+UMAP visualization of cellular structure
+seurat_clusters assigned to each cell
 
 ```{r, message='FALSE', warning='FALSE'}
 library(Seurat)
