@@ -14,7 +14,7 @@ This repository contains hands-on **single-cell RNA-seq analysis workflows** in 
 | Stage | Description | Link |
 |------|------------|------|
 | 1️⃣ Seurat Object + QC | Create Seurat object, calculate QC metrics, filter low-quality cells | [View](./01-seurat-object-scrna-qc/The_Seurat_object_-_scRNA_QC.md) |
-| 2️⃣ Normalization + PCA + Clustering | *(coming soon)* | – |
+| 2️⃣ Normalization + PCA + Clustering | Normalize counts (Log & SCT), find variable genes, dimensionality reduction (PCA), visualize cell structure (UMAP), and cluster cells | [View](./02-Normalizing-dim-reduction/Normalization_-_Dim_Reduction.md) |
 | 3️⃣ Marker genes + Annotation | *(coming soon)* | – |
 
 > Each folder contains `.Rmd`, rendered `.md`, & data used for that section.
