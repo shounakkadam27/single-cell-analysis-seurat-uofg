@@ -43,6 +43,9 @@ Control - 2 replicates - Untreated PBMC samples
 
 IFNG treated - 2 replicates - PBMCs stimulated with interferon gamma
 
+### Results Images
+Please Note: All the images for this particular workflow are stored in the figures_generated folder inside this directiory
+
 ## Set the working directory to the 1k folder and load each sample individually, giving each a unique name
 
 ``` r
